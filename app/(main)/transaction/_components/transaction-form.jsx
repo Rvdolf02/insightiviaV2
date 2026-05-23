@@ -12,18 +12,23 @@ import { Switch } from '@/components/ui/switch';
 import useFecth from '@/hooks/use-fetch';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { format } from 'date-fns';
-import { CalendarIcon, Loader2 } from 'lucide-react';
+import { CalendarIcon, Loader2, Plus, Trash2, Wallet, Info } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import React, { useEffect } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import ReceiptScanner from './receipt-scanner';
-import { useState, useMemo } from 'react';
+
 const AddTransactionForm = ({ accounts, categories, goals = [], editMode = false, initialData = null, }) => {
     const router = useRouter();
     const searchParams = useSearchParams();
     const editId = searchParams.get("edit");
-    
+
+    // State for multi-goal savings allocation
+    const [allocations, setAllocations] = useState(
+      initialData?.allocations || []
+    );
+
     const {
       register,
       setValue,
@@ -32,6 +37,7 @@ const AddTransactionForm = ({ accounts, categories, goals = [], editMode = false
       watch,
       getValues,
       reset,
+      clearErrors,
     } = useForm({
       resolver:zodResolver(transactionSchema),
       defaultValues: 
@@ -64,6 +70,8 @@ const AddTransactionForm = ({ accounts, categories, goals = [], editMode = false
     const type = watch("type");
     const isRecurring = watch("isRecurring")
     const date = watch("date");
+    const amount = watch("amount");
+
     const {
       loading: transactionLoading,
       fn: transactionFn,
@@ -71,17 +79,64 @@ const AddTransactionForm = ({ accounts, categories, goals = [], editMode = false
     } = useFecth(editMode ? updateTransaction : createTransaction);
 
     // Filter goals based on selected account
-      const filteredGoals = useMemo(() => {
-        if (!accountId) return [];
-        return goals.filter((goal) => String(goal.accountId) === String(accountId));
-      }, [accountId, goals]);
-    
+    const filteredGoals = useMemo(() => {
+      if (!accountId) return [];
+      return goals.filter((goal) => String(goal.accountId) === String(accountId));
+    }, [accountId, goals]);
+
+    // Finance Analyst Logic: Real-time calculation of remaining funds
+    const totals = useMemo(() => {
+      const baseAmount = parseFloat(amount) || 0;
+      const allocatedSum = allocations.reduce((sum, a) => sum + (parseFloat(a.amount) || 0), 0);
+      return {
+        baseAmount,
+        allocatedSum,
+        remaining: baseAmount - allocatedSum
+      };
+    }, [amount, allocations]);
+
+    const addAllocation = () => {
+      if (totals.remaining <= 0) {
+        toast.error("No remaining income to allocate");
+        return;
+      }
+      setAllocations([...allocations, { goalId: "", amount: 0 }]);
+    };
+
+    const removeAllocation = (index) => {
+      const newAllocations = [...allocations];
+      newAllocations.splice(index, 1);
+      setAllocations(newAllocations);
+    };
+
+    const updateAllocation = (index, field, value) => {
+      const newAllocations = [...allocations];
+      if (field === 'amount') {
+        const val = parseFloat(value) || 0;
+        const otherAllocated = allocations.reduce((sum, a, i) => i !== index ? sum + (parseFloat(a.amount) || 0) : sum, 0);
+        
+        // Strict Guard: Funded value cannot be greater than income transaction value
+        if (val + otherAllocated > totals.baseAmount) {
+          newAllocations[index][field] = Math.max(0, totals.baseAmount - otherAllocated);
+          toast.warning("Allocation capped at total income amount");
+        } else {
+          newAllocations[index][field] = val;
+        }
+      } else {
+        newAllocations[index][field] = value;
+      }
+      setAllocations(newAllocations);
+    };
+
     const onSubmit = async (data) => {
       const formData = {
-        ...data,
-        amount: parseFloat(data.amount),
-        goalId: data.goalId || null,
-      };
+      ...data,
+      amount: parseFloat(data.amount),
+      goalId: data.goalId || null,
+      allocations: type === "INCOME"
+        ? allocations.filter((a) => a.goalId && parseFloat(a.amount) > 0)  // ← filter here
+        : [],
+    };
       if (editMode) {
         transactionFn(editId, formData);
       } else {
@@ -92,12 +147,23 @@ const AddTransactionForm = ({ accounts, categories, goals = [], editMode = false
       if (transactionResult?.success && !transactionLoading) {
         toast.success(editMode
           ? 'Transaction updated successfully' 
-          : 'Transaction created successfully');
+          : 'Transaction saved successfully');
         reset();
+        setAllocations([]);
         router.push(`/account/${transactionResult.data.accountId}`);
       }
-    }, [transactionResult, transactionLoading, editMode]);
+    }, [transactionResult, transactionLoading, editMode, reset, router]);
 
+    useEffect(() => {
+      if (editMode && initialData?.allocations?.length > 0) {
+        setAllocations(
+          initialData.allocations.map((a) => ({
+            goalId: a.goalId,
+            amount: parseFloat(a.amount),
+          }))
+        );
+      }
+    }, [editMode]); // runs once on mount
 
     const filteredCategories = categories.filter(
       (category) => category.type === type
@@ -105,15 +171,12 @@ const AddTransactionForm = ({ accounts, categories, goals = [], editMode = false
 
   const handleScanComplete = (scannedData) => {
   if (scannedData) {
+    // 1. Update basic fields
     setValue("amount", scannedData.amount.toString());
-    setValue("date", new Date(scannedData.date));
+    if (scannedData.description) setValue("description", scannedData.description);
 
-    if (scannedData.description) {
-      setValue("description", scannedData.description);
-    }
-
+    // 2. Handle Type and Category Logic
     if (scannedData.category) {
-      // find the category object from categories
       const matchedCategory = categories.find(
         (cat) =>
           cat.id.toLowerCase() === scannedData.category.toLowerCase() ||
@@ -121,11 +184,15 @@ const AddTransactionForm = ({ accounts, categories, goals = [], editMode = false
       );
 
       if (matchedCategory) {
-        // also update the type so filteredCategories matches
+        // CRITICAL: We update the TYPE first. 
         setValue("type", matchedCategory.type);
-        // set category by ID so <Select> auto-selects
-        setValue("category", matchedCategory.id);
+        
+        setTimeout(() => {
+          setValue("category", matchedCategory.id);
+        }, 0);
       }
+    } else if (scannedData.type) {
+      setValue("type", scannedData.type);
     }
   }
 };
@@ -136,13 +203,13 @@ const AddTransactionForm = ({ accounts, categories, goals = [], editMode = false
       {/* AI Recipt Scanner*/}
       {!editMode && <ReceiptScanner onScanComplete={handleScanComplete} />}
 
-
-
-
       <div className='space-y-2'>
         <label className='text-sm font-medium'>Type</label>
           <Select 
-            onValueChange={(value) => setValue("type", value)}
+            onValueChange={(value) => {
+              setValue("type", value);
+              if (value !== "INCOME") setAllocations([]);
+            }}
             value={type}
           >
           <SelectTrigger>
@@ -158,9 +225,6 @@ const AddTransactionForm = ({ accounts, categories, goals = [], editMode = false
           <p className='text-sm text-red-500'>{errors.type.message}</p>
         )}
       </div>
-
-
-
 
       <div className='grid gap-6 md:grid-cols-2'>
             <div className='space-y-2'>
@@ -195,7 +259,12 @@ const AddTransactionForm = ({ accounts, categories, goals = [], editMode = false
 
                  ))}
 
-                 <CreateAccountDrawer>
+                 <CreateAccountDrawer redirectTo="/transaction/create"
+                 onSuccess={(newAccount) => {
+                    clearErrors(); 
+                    setValue("accountId", newAccount.id);
+                  }}
+                 >
                     <Button variant='ghost' 
                     className='w-full select-none items-center text-sm outline-none'
                     >
@@ -276,10 +345,10 @@ const AddTransactionForm = ({ accounts, categories, goals = [], editMode = false
         </div>
           
         
-        <div className='flex items-center justify-between rounded -lg border p-3'>
+        <div className='flex items-center justify-between rounded-lg border p-3'>
             <div className='space-y-0.5'>
               <label htmlFor="isDefault" className='text-sm font-medium cursor-pointer'>Recurring Transaction</label>
-              <p className='text-sm text-muted-foreground'>Set up a recuriing schedule for this transaction</p>
+              <p className='text-sm text-muted-foreground'>Set up a recurring schedule for this transaction</p>
             </div>
             <Switch 
               checked={isRecurring}
@@ -314,69 +383,122 @@ const AddTransactionForm = ({ accounts, categories, goals = [], editMode = false
           </div>  
         )}
 
-      
-
-
-          {/* No goals yet */}
-          {type === "INCOME" && filteredGoals.length === 0 && (
-            <p className="text-sm text-muted-foreground">
-              You don't have any goals yet. You can still record income normally.
-            </p>
-          )}
-        
-          {/* Goal Selection (only for INCOME type + if account has goals) */}
-          {type === "INCOME" && filteredGoals.length > 0 && (
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Select Goal</label>
-
-              <Select
-                onValueChange={(value) => setValue("goalId", value)}
-                value={watch("goalId")}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select Goal" />
-                </SelectTrigger>
-                <SelectContent>
-                  {filteredGoals.map((goal) => (
-                    <SelectItem key={goal.id} value={goal.id}>
-                      {goal.title} (Target: ₱{goal.amount.toLocaleString("en-PH")})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
-              {errors.goalId && (
-                <p className="text-sm text-red-500">{errors.goalId.message}</p>
-              )}
+        {/* Savings Allocation Engine - Finance Focused UI */}
+        {type === "INCOME" && (
+          <div className='space-y-4 rounded-xl border-2 border-primary/20 p-5 bg-primary/[0.02] shadow-sm'>
+            <div className='flex items-center justify-between'>
+              <div className='flex items-center gap-2'>
+                <div className='p-2 bg-primary/10 rounded-lg'>
+                  <Wallet className='h-5 w-5 text-primary' />
+                </div>
+                <div>
+                  <h3 className='font-bold text-primary leading-none'>Savings Allocation</h3>
+                  <p className='text-[10px] text-muted-foreground font-medium mt-1 uppercase tracking-wider'>Distribution Profile</p>
+                </div>
+              </div>
+              <div className='text-right bg-white px-3 py-1.5 rounded-lg border shadow-sm'>
+                <p className='text-[10px] text-muted-foreground uppercase font-bold tracking-tight'>Unallocated Fund</p>
+                <p className={`text-sm font-mono font-bold ${totals.remaining < 0 ? 'text-red-500' : 'text-emerald-600'}`}>
+                  ₱{totals.remaining.toLocaleString("en-PH", { minimumFractionDigits: 2 })}
+                </p>
+              </div>
             </div>
-          )}
 
-              {/* Reminder */}
-          {type === "INCOME" && filteredGoals.length > 0 && !watch("goalId") && (
-            <p className="text-sm text-yellow-600">
-              Tip: Assigning this income to a goal will help you track progress faster.
-            </p>
-          )}
+            {filteredGoals.length === 0 ? (
+               <div className='flex items-start gap-3 p-3 bg-amber-50 rounded-lg border border-amber-100 text-amber-800'>
+                <Info className='h-5 w-5 mt-0.5 flex-shrink-0' />
+                <p className="text-xs font-medium">
+                  No active savings goals found for this account. Create goals to enable allocation streams.
+                </p>
+              </div>
+            ) : (
+              <div className='space-y-3'>
+                {allocations.map((allocation, index) => (
+                  <div key={index} className='flex gap-2 items-end animate-in fade-in zoom-in-95 duration-200'>
+                    <div className='flex-1 space-y-1'>
+                      <label className='text-[10px] uppercase font-bold text-muted-foreground ml-1'>Target Goal</label>
+                      <Select 
+                        value={allocation.goalId} 
+                        onValueChange={(val) => updateAllocation(index, 'goalId', val)}
+                      >
+                        <SelectTrigger className='h-10'>
+                          <SelectValue placeholder="Choose Goal" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {filteredGoals.map((g) => (
+                            <SelectItem key={g.id} value={g.id}>{g.title}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className='w-36 space-y-1'>
+                      <label className='text-[10px] uppercase font-bold text-muted-foreground ml-1'>Fund Amount</label>
+                      <div className='relative'>
+                        <span className='absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-xs font-bold'>₱</span>
+                        <Input 
+                          type="number" 
+                          className='h-10 pl-7 font-mono'
+                          value={allocation.amount}
+                          onChange={(e) => updateAllocation(index, 'amount', e.target.value)}
+                          placeholder="0.00"
+                        />
+                      </div>
+                    </div>
+                    <Button 
+                      type="button" 
+                      variant="ghost" 
+                      size="icon" 
+                      className='h-10 w-10 text-muted-foreground hover:text-red-600 hover:bg-red-50 transition-colors'
+                      onClick={() => removeAllocation(index)}
+                    >
+                      <Trash2 className='h-4 w-4' />
+                    </Button>
+                  </div>
+                ))}
+                
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  size="sm" 
+                  className='w-full border-dashed py-6 group hover:bg-primary/[0.03] transition-all'
+                  onClick={addAllocation}
+                  disabled={totals.remaining <= 0}
+                >
+                  <div className='flex items-center justify-center gap-2'>
+                    <div className='p-1 rounded-full bg-primary/10 group-hover:bg-primary/20 transition-colors'>
+                      <Plus className='h-4 w-4 text-primary' />
+                    </div>
+                    <span className='font-semibold text-primary/80 group-hover:text-primary'>Add New Allocation Stream</span>
+                  </div>
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
 
-        <div className='flex gap-4'>
+        <div className='flex gap-4 pt-4'>
           <Button
              type='button'
             variant='outline'
-            className='w-full'
+            className='w-full font-semibold'
             onClick={() => router.back()}
           >
             Cancel
           </Button>
-          <Button type="submit" className="w-full" disabled={transactionLoading}>
+          <Button 
+            type="submit" 
+            className="w-full font-bold shadow-lg shadow-primary/20" 
+            disabled={transactionLoading || (type === "INCOME" && totals.remaining < 0)}
+          >
           {transactionLoading ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              {editMode ? "Updating..." : "Creating..."}
+              {editMode ? "Processing..." : "Finalizing..."}
             </>
           ) : editMode? ( 
-            "Update Transaction"
+            "Update Financial Record"
           ): (
-            "Create Transaction"
+            "Post Transaction"
           )}
         </Button>
         </div>

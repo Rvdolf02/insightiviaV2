@@ -44,6 +44,11 @@ const handleGenerate = async () => {
       return;
     }
 
+    if (res.status === "RATE_LIMITED") {
+      toast.error("You've reached your weekly limit. Try again tomorrow.");
+      onOpenChange?.(false);
+      return;
+    }
     // SUCCESS CASE
     setResult(res);
     setShowCard(true);

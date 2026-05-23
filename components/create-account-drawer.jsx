@@ -15,7 +15,7 @@ import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
 
-const CreateAccountDrawer = ({ children, mode, account, onSuccess, openFromQuery = false }) => {
+const CreateAccountDrawer = ({ children, mode, account, onSuccess, openFromQuery = false, redirectTo = "/dashboard" }) => {
   const [open, setOpen] = useState(openFromQuery);
   const router = useRouter();
 
@@ -61,11 +61,11 @@ const CreateAccountDrawer = ({ children, mode, account, onSuccess, openFromQuery
       if (onSuccess) onSuccess(data);
 
     // Clean the URL: remove ?openCreateAccount=true
-      router.replace("/dashboard");
+      router.replace(redirectTo);
       setHandled(true); // prevent loop
       router.refresh();
     }
-  }, [data, loading, mode, reset, onSuccess, router, handled]);
+  }, [data, loading, mode, reset, onSuccess, router, handled, redirectTo]);
 
   // Reset the flag when making a new request
   const onSubmit = async (values) => {
@@ -136,7 +136,7 @@ const CreateAccountDrawer = ({ children, mode, account, onSuccess, openFromQuery
                   type="button"
                   variant="outline" 
                   className="flex-1"  
-                  onClick={() => router.replace("/dashboard")}
+                  onClick={() => router.replace(redirectTo)}
                 >
                   Cancel
                 </Button>

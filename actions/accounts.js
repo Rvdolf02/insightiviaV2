@@ -61,38 +61,44 @@ export async function updateDefaultAccount(accountId) {
 } 
 
 export async function getAccountWithTransactions(accountId) {
-    const { userId } = await auth();   
-    if (!userId) throw new Error("Unauthorized");
+  const { userId } = await auth();
+  if (!userId) throw new Error("Unauthorized");
 
-            const user = await db.user.findUnique({
-                where: { clerkUserId: userId },
-            });
+  const user = await db.user.findUnique({ where: { clerkUserId: userId } });
+  if (!user) throw new Error("User not found");
 
-        if (!user) {
-            throw new Error("User not found");
-        }
-
-        const account = await db.account.findUnique({
-            where: { id: accountId, userId: user.id },
-            include:{
-                transactions: {
-                    orderBy: { date: "desc" },
-                    include: {
-                        goal: true, // access goal.title
-                        },
-                    },
-                _count: {
-                    select: { transactions: true },
-                },
+  const account = await db.account.findUnique({
+    where: { id: accountId, userId: user.id },
+    include: {
+      transactions: {
+        orderBy: { date: "desc" },
+        include: {
+          allocations: {
+            include: {
+              goal: true, // so we can access goal.title per allocation
             },
-        });
+          },
+        },
+      },
+      _count: {
+        select: { transactions: true },
+      },
+    },
+  });
 
-        if (!account) return null;
+  if (!account) return null;
 
-        return {
-            ...serializeTransaction(account),
-            transactions: account.transactions.map(serializeTransaction),
-        };
+  return {
+    ...serializeTransaction(account),
+    transactions: account.transactions.map((t) => ({
+      ...serializeTransaction(t),
+      allocations: t.allocations.map((a) => ({
+        goalId: a.goalId,
+        goalTitle: a.goal?.title ?? "Unknown Goal",
+        amount: a.amount.toNumber(),
+      })),
+    })),
+  };
 }
 
 export async function bulkDeleteTransactions(transactionIds) {
@@ -117,7 +123,6 @@ export async function bulkDeleteTransactions(transactionIds) {
         type: true,
         amount: true,
         accountId: true,
-        goalId: true,
       },
     });
 
@@ -135,36 +140,48 @@ export async function bulkDeleteTransactions(transactionIds) {
     }, {});
 
     await db.$transaction(async (tx) => {
-      // --- GOAL UPDATES ---
-      for (const t of transactions) {
-        if (t.type === "INCOME" && t.goalId) {
-          await tx.goal.update({
-            where: { id: t.goalId },
-            data: {
-              currentAmount: { decrement: t.amount },
-            },
-          });
-        }
-      }
 
-      // --- DELETE TRANSACTIONS ---
-      await tx.transaction.deleteMany({
-        where: {
-          id: { in: transactionIds },
-          userId: user.id,
+    // Get allocations for all transactions
+    const allocations = await tx.transactionAllocation.findMany({
+      where: {
+        transactionId: { in: transactionIds },
+      },
+    });
+
+    // Reverse goal funding (CRITICAL FIX)
+    const goalAdjustments = allocations.reduce((acc, alloc) => {
+      const amount = Number(alloc.amount);
+      acc[alloc.goalId] = (acc[alloc.goalId] || 0) + amount;
+      return acc;
+    }, {});
+
+    for (const [goalId, amount] of Object.entries(goalAdjustments)) {
+      await tx.goal.updateMany({
+        where: { id: goalId },
+        data: {
+          currentAmount: { decrement: amount },
         },
       });
+    }
 
-      // --- UPDATE ACCOUNT BALANCES ---
-      for (const [accountId, balanceChange] of Object.entries(accountBalanceChanges)) {
-        await tx.account.update({
-          where: { id: accountId },
-          data: {
-            balance: { increment: balanceChange },
-          },
-        });
-      }
+    // delete transactions
+    await tx.transaction.deleteMany({
+      where: {
+        id: { in: transactionIds },
+        userId: user.id,
+      },
     });
+
+    // update account balances (your existing logic)
+    for (const [accountId, balanceChange] of Object.entries(accountBalanceChanges)) {
+      await tx.account.update({
+        where: { id: accountId },
+        data: {
+          balance: { increment: balanceChange },
+        },
+      });
+    }
+  });
 
     revalidatePath("/dashboard");
     revalidatePath("/account/[id]");

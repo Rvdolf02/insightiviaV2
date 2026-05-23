@@ -46,13 +46,13 @@ export async function getUserAccounts() {
 export async function getDashboardData() {
   const { userId } = await auth();
 
-  if (!userId) return []; // ✅ no crash
+  if (!userId) return []; 
 
   const user = await db.user.findUnique({
     where: { clerkUserId: userId },
   });
 
-  if (!user) return []; // ✅ user missing in DB → return empty
+  if (!user) return [];
 
   const transactions = await db.transaction.findMany({
     where: { userId: user.id },
@@ -62,6 +62,92 @@ export async function getDashboardData() {
   return transactions.map(serializeTransaction);
 }
 
+function serializeDecimal(obj) {
+  return JSON.parse(JSON.stringify(obj));
+}
+
+export async function getStatementData(accountId, startDate, endDate) {
+  const { userId } = await auth();
+  if (!userId) throw new Error("Unauthorized");
+
+  const user = await db.user.findUnique({
+    where: { clerkUserId: userId },
+  });
+
+  if (!user) throw new Error("User not found");
+
+  const account = await db.account.findFirst({
+    where: {
+      userId: user.id,
+      ...(accountId
+        ? { id: accountId } // use specific account
+        : { isDefault: true } // fallback to default account
+      ),
+    },
+    include: {
+      user: true,
+      transactions: {
+        where: {
+          date: {
+            gte: new Date(startDate),
+            lte: new Date(endDate),
+          },
+        },
+        orderBy: { date: "asc" },
+        include: {
+          allocations: {
+            include: { goal: true },
+          },
+        },
+      },
+    },
+  });
+
+  if (!account) {
+    throw new Error(
+      accountId
+        ? "Account not found"
+        : "No default account found"
+    );
+  }
+
+  // --- Running Balance ---
+  let runningBalance = 0;
+
+  const transactionsWithBalance = account.transactions.map((t) => {
+    const amount = Number(t.amount);
+    runningBalance += t.type === "INCOME" ? amount : -amount;
+
+    return {
+      ...t,
+      runningBalance,
+    };
+  });
+
+  // --- Summary ---
+  const totalIn = transactionsWithBalance
+    .filter((t) => t.type === "INCOME")
+    .reduce((acc, t) => acc + Number(t.amount), 0);
+
+  const totalOut = transactionsWithBalance
+    .filter((t) => t.type === "EXPENSE")
+    .reduce((acc, t) => acc + Number(t.amount), 0);
+
+  const beginningBalance =
+    Number(account.balance) - (totalIn - totalOut);
+
+    return serializeDecimal({
+    account,
+    user: account.user,
+    transactions: transactionsWithBalance,
+    summary: {
+      beginningBalance,
+      totalIn,
+      totalOut,
+      endingBalance: Number(account.balance),
+    },
+  });
+}
 
 export async function createAccount(data) {
     try {
@@ -267,7 +353,7 @@ export async function getDailyTips() {
       return { status: "RATE_LIMITED" };
     }
 
-    // ✅ Build stats
+    // Build stats
     const stats = transactions.reduce(
       (s, t) => {
         const amount = Number(t.amount);
@@ -367,11 +453,6 @@ export async function getSpendsenseResult() {
       return { status: "NO_ACCOUNT" };
     }
 
-    // All validations before rate limiter
-    if (!user.accounts || user.accounts.length === 0) {
-      return { status: "NO_ACCOUNT" };
-    }
-
     const defaultAccount = user.accounts.find((a) => a.isDefault);
     if (!defaultAccount) {
       return { status: "NO_DEFAULT" };
@@ -392,15 +473,17 @@ export async function getSpendsenseResult() {
     const req = await request();
     const decision = await ajSpendsense.protect(req, { userId, requested: 1 });
 
-    if (decision.isDenied()) {
+   {/*} if (decision.isDenied()) {
       if (decision.reason?.isRateLimit && decision.reason.isRateLimit()) {
         throw new Error("You can run SpendSense once per 7 days. Try again later.");
       }
       throw new Error("Request blocked by rate limiter.");
     }
+  */}
 
-
-    
+    if (decision.isDenied()) {
+      return { status: "RATE_LIMITED" };
+    }
 
 
     // Build stats: totals and category breakdown

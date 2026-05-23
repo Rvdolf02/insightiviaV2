@@ -3,26 +3,33 @@
 import { usePathname } from "next/navigation";
 import { useEffect } from "react";
 
-/**
- * This client component only hides header/footer when /cha-ching is active
- * It doesn’t import any server components.
- */
-export default function LayoutVisibilityClient({ children, footer }) {
+export default function LayoutVisibilityClient({ children }) {
   const pathname = usePathname();
-  const isChaChing = pathname.startsWith("/cha-ching");
+
+  // Add the note-taking/create path to your hidden list
+  const shouldHideLayout = 
+    pathname.startsWith("/cha-ching") || 
+    pathname.startsWith("/feature-guide") ||
+    pathname.startsWith("/note-taking"); 
 
   useEffect(() => {
     const header = document.querySelector("header");
     const footerEl = document.querySelector("footer");
 
-    if (isChaChing) {
+    if (shouldHideLayout) {
       if (header) header.style.display = "none";
       if (footerEl) footerEl.style.display = "none";
     } else {
       if (header) header.style.display = "";
       if (footerEl) footerEl.style.display = "";
     }
-  }, [pathname, isChaChing]);
+    
+    // Cleanup function to ensure styles reset if component unmounts
+    return () => {
+      if (header) header.style.display = "";
+      if (footerEl) footerEl.style.display = "";
+    };
+  }, [pathname, shouldHideLayout]);
 
   return <>{children}</>;
 }

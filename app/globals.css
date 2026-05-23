@@ -117,3 +117,64 @@ body {
 .recharts-surface:focus {
   outline: none !important;
 }
+
+
+/* Custom styling for Tiptap Task List */
+/* 1. Reset the base list container */
+.prose ul[data-type="taskList"] {
+  list-style: none;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+/* 2. Align the row */
+.prose ul[data-type="taskList"] li {
+  display: flex;
+  align-items: flex-start; /* Keeps checkbox at the top for multi-line notes */
+  gap: 0.85rem;
+  margin-bottom: 0.75rem;
+}
+
+/* 3. Your custom circular checkbox styling */
+.prose ul[data-type="taskList"] input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 1.35rem;
+  height: 1.35rem;
+  border: 2px solid #cbd5e1;
+  border-radius: 50%; /* Perfect circle */
+  cursor: pointer;
+  margin-top: 0.2rem; /* Fine-tune this for vertical centering with the first line */
+  flex-shrink: 0;
+  transition: all 0.2s;
+  display: grid;
+  place-content: center;
+}
+
+.prose ul[data-type="taskList"] input[type="checkbox"]:checked {
+  background-color: #2563eb;
+  border-color: #2563eb;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='20 6 9 17 4 12'%3E%3C/polyline%3E%3C/svg%3E");
+  background-size: 65%;
+  background-repeat: no-repeat;
+  background-position: center;
+}
+
+/* 4. THE FIX: Kill the paragraph margin that causes the "sink" */
+.prose ul[data-type="taskList"] li > div {
+  flex: 1;
+}
+
+.prose ul[data-type="taskList"] li > div > p {
+  margin: 0 !important; /* This stops the text from jumping down */
+  line-height: 1.75rem; /* Matches the checkbox height roughly */
+}
+
+/* Placeholder styling */
+.tiptap p.is-editor-empty:first-child::before {
+  color: #cbd5e1;
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}

@@ -25,6 +25,12 @@ export const transactionSchema = z.object({
         .refine((val) => val.length > 0, {
           message: "Category is required",
         }),
+    allocations: z.array(
+          z.object({
+            goalId: z.string().min(1),
+            amount: z.coerce.number().positive(),
+          })
+        ).optional().default([]),
 
     isRecurring: z.boolean().default(false),
     recurringInterval: z
@@ -44,18 +50,18 @@ export const transactionSchema = z.object({
 export const goalSchema = z.object({
   title: z
     .string()
-    .min(1, "Goal title is required"),
+    .min(1, "Please enter an allocation name"),
 
   amount: z
     .string()
-    .min(1, "Goal amount is required")
+    .min(1, "Amount must be greater than ₱0.00")
     .refine((val) => !isNaN(Number(val)) && Number(val) > 0, {
-      message: "Goal amount must be a valid positive number",
+      message: "Amount must be a valid positive number",
     }),
 
   accountId: z
     .string()
-    .min(1, "Account is required"),
+    .min(1, "Please select a funding source"),
 });
 
 // if this code cannot handle the program then uninstall the current zod and install downgrade version
@@ -70,3 +76,4 @@ export const goalSchema = z.object({
         });
     }
 });*/
+

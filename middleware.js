@@ -6,6 +6,7 @@ const isProtectedRoute = createRouteMatcher([
     "/account(.*)",
     "/transaction(.*)",
     "/cha-ching(.*)",
+    "/note-taking(.*)",
 ]);
 
 const aj = arcjet({
@@ -24,12 +25,19 @@ const aj = arcjet({
 const clerk = clerkMiddleware(async (auth, req) => {
     const { userId } = await auth();
 
+    if (!userId && req.nextUrl.pathname.startsWith("/api")) {
+  return new Response(
+    JSON.stringify({ message: "Unauthorized" }),
+    { status: 401 }
+  );
+}
+
     if (!userId && isProtectedRoute(req)) {
      const { redirectToSignIn } = await auth();   
 
      return redirectToSignIn();
     }
-});
+}); 
 
 export default createMiddleware(aj, clerk);
 

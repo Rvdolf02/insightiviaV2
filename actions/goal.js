@@ -154,6 +154,19 @@ export async function deleteGoal(goalId) {
     const { userId } = await auth();
     if (!userId) throw new Error("Unauthorized");
 
+    const allocationCount = await db.transactionAllocation.count({
+      where: { goalId },
+    });
+
+    if (allocationCount > 0) {
+      return {
+        success: false,
+        type: "HAS_ALLOCATIONS",
+        message:
+          "This allocation cannot be removed because it already has funded transactions.",
+      };
+    }
+
     await db.goal.delete({
       where: { id: goalId },
     });

@@ -25,6 +25,8 @@ model User {
   accounts           Account[]
   budgets            Budget[]
   goals              Goal[]
+  notes              Note[]
+  todoItems          TodoItem[]
   createdAt          DateTime      @default(now())
   updatedAt          DateTime      @updatedAt
 
@@ -69,15 +71,29 @@ model Transaction{
   user              User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
   accountId         String               
   account           Account              @relation(fields: [accountId], references: [id], onDelete: Cascade)
-  goalId            String?
-  goal              Goal?               @relation(fields: [goalId], references: [id], onDelete: Cascade)           
+  allocations       TransactionAllocation[]     
   createdAt         DateTime             @default(now())
   updatedAt         DateTime             @updatedAt
 
   @@index([userId])
   @@index([accountId])
-  @@index([goalId])
   @@map("transactions")
+}
+
+model TransactionAllocation {
+  id            String      @id @default(uuid())
+  transactionId String
+  goalId        String
+  amount        Decimal
+
+  transaction   Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  goal          Goal        @relation(fields: [goalId], references: [id], onDelete: Restrict)
+
+  createdAt     DateTime    @default(now())
+
+  @@index([transactionId])
+  @@index([goalId])
+  @@map("transaction_allocations")
 }
 
 enum TransactionType{
@@ -120,11 +136,59 @@ model Goal{
   user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   accountId       String
   account         Account       @relation(fields: [accountId], references: [id], onDelete: Cascade)
-  transactions     Transaction[]
+  allocations     TransactionAllocation[]
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
 
   @@index([userId])
   @@index([accountId])
   @@map("goals")
+}
+
+model Note {
+  id                String            @id @default(uuid())
+  title             String
+  content           String?           // For paragraph notes
+  category          String            // AI provided
+  priority          PriorityLevel     @default(MEDIUM)
+  isRecurring       Boolean           @default(false)
+  nextRecurringDate DateTime?
+  recurringInterval RecurringInterval?
+
+  // Relations
+  userId            String
+  user              User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  todoItems         TodoItem[]        // The checklist items
+
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  @@index([userId])
+  @@map("notes")
+}
+
+model TodoItem {
+  id               String   @id @default(uuid())
+  description      String   // Individual to-do text
+  isAccomplished   Boolean  @default(false)
+  order            Int      @default(0) // To maintain sequence (To-do 1, 2, etc.)
+  
+  // Relations
+  noteId           String
+  note             Note     @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  userId           String
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([noteId])
+  @@index([userId])
+  @@map("todo_items")
+}
+
+enum PriorityLevel {
+  HIGH
+  MEDIUM
+  LOW
 }

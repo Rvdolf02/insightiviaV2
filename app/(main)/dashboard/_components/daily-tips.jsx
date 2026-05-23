@@ -2,12 +2,13 @@
 
 import React, { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
-import { Sparkles, Lightbulb, Activity, Coins } from "lucide-react";
+import { Sparkles, Lightbulb, Activity, Coins, FileText } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
 import { getDailyTips } from "@/actions/dashboard";
 import Spendsense from "./spendsense";
 import { useRouter } from "next/navigation";
+import StatementPage from "./statement-of-account";
 
 const DailyTips = () => {
   const [showConfirm, setShowConfirm] = useState(false);
@@ -16,6 +17,7 @@ const DailyTips = () => {
   const [showCard, setShowCard] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const [spendsenseOpen, setSpendsenseOpen] = useState(false);
+  const [soaOpen, setSoaOpen] = useState(false);
   const router = useRouter();
 
  const handleGenerateTips = async () => {
@@ -103,77 +105,76 @@ const DailyTips = () => {
   return (
     <>
       {/* 🌟 Floating Action Button Group */}
-      <div className="fixed bottom-5 right-5 md:bottom-8 md:right-8 z-50 flex flex-col items-end">
-        {/* Hidden Buttons */}
-        <div
-          className={`flex flex-col items-end space-y-2 mb-2 transition-all duration-300 ${
-            showMenu
-              ? "opacity-100 translate-y-0"
-              : "opacity-0 translate-y-4 pointer-events-none"
-          }`}
-        >
-          {/* 1️⃣ Daily Tips */}
-          <div className="flex items-center space-x-2">
-            <span
-              className={`bg-gray-800 text-white text-sm px-2 py-1 rounded-md shadow-md transition-opacity duration-200 ${
-                showMenu ? "opacity-100" : "opacity-0"
-              }`}
-            >
-              Daily Tips
-            </span>
-            <button
-              onClick={() => setShowConfirm(true)}
-              className="bg-yellow-500 hover:bg-yellow-600 text-white p-3 rounded-full shadow-lg transition"
-            >
-              <Lightbulb className="w-5 h-5" />
-            </button>
-          </div>
+      <div className="fixed bottom-5 right-5 md:bottom-8 md:right-8 z-50 flex flex-col items-end pointer-events-none">
+       {/* Hidden Buttons wrapper — this alone controls pointer events */}
+<div className={`flex flex-col items-end space-y-2 mb-2 transition-all duration-300 ${
+  showMenu
+    ? "opacity-100 translate-y-0 pointer-events-auto"
+    : "opacity-0 translate-y-4 pointer-events-none"
+}`}>
 
-          {/* 2️⃣ SpendSense */}
-          <div className="flex items-center space-x-2">
-            <span
-              className={`bg-gray-800 text-white text-sm px-2 py-1 rounded-md shadow-md transition-opacity duration-200 ${
-                showMenu ? "opacity-100" : "opacity-0"
-              }`}
-            >
-              SpendSense
-            </span>
-            <button
-              onClick={() => setSpendsenseOpen(true)}
-              className="bg-blue-500 hover:bg-blue-600 text-white p-3 rounded-full shadow-lg transition"
-            >
-              <Activity className="w-5 h-5" />
-            </button>
-          </div>
+  {/* Remove pointer-events-auto from all spans and buttons inside */}
+  <div className="flex items-center space-x-2">
+    <span className={`bg-gray-800 text-white text-sm px-2 py-1 rounded-md shadow-md transition-opacity duration-200 ${
+      showMenu ? "opacity-100" : "opacity-0"
+    }`}>Daily Tips</span>
+    <button onClick={() => setShowConfirm(true)}
+      className="bg-yellow-500 hover:bg-yellow-600 text-white p-3 rounded-full shadow-lg transition">
+      <Lightbulb className="w-5 h-5" />
+    </button>
+  </div>
 
-          {/* 3️⃣ Cha-Ching */}
-          <div className="flex items-center space-x-2">
-            <span
-              className={`bg-gray-800 text-white text-sm px-2 py-1 rounded-md shadow-md transition-opacity duration-200 ${
-                showMenu ? "opacity-100" : "opacity-0"
-              }`}
-            >
-              Cha-Ching
-            </span>
-            <button
-              onClick={handleChaChingClick}
-              className="bg-gray-400 hover:bg-gray-500 text-white p-3 rounded-full shadow-lg transition"
-            >
-              <Coins className="w-5 h-5" />
-            </button>
-          </div>
-        </div>
+  <div className="flex items-center space-x-2">
+    <span className={`bg-gray-800 text-white text-sm px-2 py-1 rounded-md shadow-md transition-opacity duration-200 ${
+      showMenu ? "opacity-100" : "opacity-0"
+    }`}>SpendSense</span>
+    <button onClick={() => setSpendsenseOpen(true)}
+      className="bg-blue-500 hover:bg-blue-600 text-white p-3 rounded-full shadow-lg transition">
+      <Activity className="w-5 h-5" />
+    </button>
+  </div>
 
-        {/* 🌟 Main Button — now acts as toggle */}
-        <button
-          aria-label="Menu"
-          onClick={() => setShowMenu((prev) => !prev)}
-          className={`bg-gradient-to-r from-yellow-500 to-orange-500 text-white p-4 rounded-full shadow-lg transition-transform duration-300 ${
-            showMenu ? "rotate-45" : "hover:scale-110"
-          }`}
-        >
-          <Sparkles className="w-6 h-6 transition-transform" />
-        </button>
+  <div className="flex items-center space-x-2">
+    <span className={`bg-gray-800 text-white text-sm px-2 py-1 rounded-md shadow-md transition-opacity duration-200 ${
+      showMenu ? "opacity-100" : "opacity-0"
+    }`}>Statement of Account</span>
+    <button onClick={() => setSoaOpen(true)}
+      className="bg-blue-500 hover:bg-blue-600 text-white p-3 rounded-full shadow-lg transition">
+      <Activity className="w-5 h-5" />
+    </button>
+  </div>
+
+  <div className="flex items-center space-x-2">
+    <span className={`bg-gray-800 text-white text-sm px-2 py-1 rounded-md shadow-md transition-opacity duration-200 ${
+      showMenu ? "opacity-100" : "opacity-0"
+    }`}>Note Library</span>
+    <button onClick={() => router.push("/note-taking")}
+      className="bg-indigo-600 hover:bg-indigo-700 text-white p-3 rounded-full shadow-lg transition">
+      <FileText className="w-5 h-5" />
+    </button>
+  </div>
+
+  <div className="flex items-center space-x-2">
+    <span className={`bg-gray-800 text-white text-sm px-2 py-1 rounded-md shadow-md transition-opacity duration-200 ${
+      showMenu ? "opacity-100" : "opacity-0"
+    }`}>Cha-Ching</span>
+    <button onClick={handleChaChingClick}
+      className="bg-gray-400 hover:bg-gray-500 text-white p-3 rounded-full shadow-lg transition">
+      <Coins className="w-5 h-5" />
+    </button>
+  </div>
+</div>
+
+{/* Main toggle — keep pointer-events-auto here since it's always visible */}
+<button
+  aria-label="Menu"
+  onClick={() => setShowMenu((prev) => !prev)}
+  className={`pointer-events-auto bg-gradient-to-r from-yellow-500 to-orange-500 text-white p-4 rounded-full shadow-lg transition-transform duration-300 ${
+    showMenu ? "rotate-45" : "hover:scale-110"
+  }`}
+>
+  <Sparkles className="w-6 h-6 transition-transform" />
+</button>
       </div>
 
       {/* Confirmation Modal */}
@@ -337,6 +338,7 @@ const DailyTips = () => {
 
       {/* SpendSense Modal */}
       <Spendsense controlledOpen={spendsenseOpen} onOpenChange={setSpendsenseOpen} />
+      <StatementPage controlledOpen={soaOpen} onOpenChange={setSoaOpen}/>
     </>
   );
 };

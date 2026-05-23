@@ -11,7 +11,6 @@ import GoalProgress from './_components/goal-progress';
 import { getUserGoals } from '@/actions/goal';
 import DailyTips from './_components/daily-tips';
 import DashboardWrapper from './page-wrapper';
-
 async function DashboardPage () {
 
  
@@ -34,6 +33,7 @@ async function DashboardPage () {
      <div className='space-y-8'>
       {/* Daily Tips: spendsense + cha-ching Main Floating Button + Popup */}
       <DailyTips />
+
 
     {/* Budget & Goal Progress */}
     {defaultAccount && (

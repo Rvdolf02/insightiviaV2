@@ -301,7 +301,7 @@ useEffect(() => {
                 </div>
             </TableHead>
             <TableHead>Description</TableHead>
-             <TableHead>Goal</TableHead>
+             <TableHead>Savings Allocation</TableHead>
             <TableHead 
                 className='cursor-pointer'
                 onClick={() => handleSort("category")}
@@ -342,114 +342,117 @@ useEffect(() => {
                     </TableCell>
                 </TableRow>
             ) : (
-            paginatedTransactions.map((transaction) => (
-                <TableRow key={transaction.id}>
-                    <TableCell className="font-medium">
-                        <Checkbox 
-                        onCheckedChange={() => handleSelect(transaction.id)}
-                        checked={selectedIds.includes(transaction.id)}
-                        />
-                    </TableCell>
-                    <TableCell>
-                        {format(new Date(transaction.date), "PP")}
-                    </TableCell>
-                    <TableCell>{transaction.description}</TableCell>
-                    <TableCell>
-                    {transaction.goal ? (
-                      <Badge variant="secondary" className="bg-blue-100 text-blue-700">
-                        🎯 {transaction.goal.title}
+                paginatedTransactions.map((transaction) => (
+            <TableRow key={transaction.id}>
+
+              {/* 1. Checkbox */}
+              <TableCell className="font-medium">
+                <Checkbox
+                  onCheckedChange={() => handleSelect(transaction.id)}
+                  checked={selectedIds.includes(transaction.id)}
+                />
+              </TableCell>
+
+              {/* 2. Date */}
+              <TableCell>
+                {format(new Date(transaction.date), "PP")}
+              </TableCell>
+
+              {/* 3. Description */}
+              <TableCell>{transaction.description}</TableCell>
+
+              {/* 4. Savings Allocation */}
+              <TableCell>
+                {transaction.allocations?.length > 0 ? (
+                  <div className="flex flex-col gap-1">
+                    {transaction.allocations.map((a) => (
+                      <Badge
+                        key={a.goalId}
+                        variant="secondary"
+                        className="bg-blue-100 text-blue-700 w-fit"
+                      >
+                        🎯 {a.goalTitle} — ₱{a.amount.toLocaleString("en-PH", { minimumFractionDigits: 2 })}
                       </Badge>
-                      ) : (
-                        <span className="text-muted-foreground">No Goal</span>
-                      )}
-                    </TableCell>
+                    ))}
+                  </div>
+                ) : (
+                  <span className="text-muted-foreground text-sm">No Allocation</span>
+                )}
+              </TableCell>
 
-                    <TableCell className='capitalize'>
-                        <span 
-                            style={{
-                                background: categoryColors[transaction.category],
-                            }}
-                                className='px-2 py-1 rounded text-white text-sm'
-                         >
-                          {transaction.category}
-                        </span>
-                    
-                    </TableCell>
-                    <TableCell className={cn(
-                            "text-right font-medium",
-                            transaction.type === "EXPENSE"
-                            ? "text-red-500"
-                            : "text-green-500"
-                        )}
+              {/* 5. Category */}
+              <TableCell className="capitalize">
+                <span
+                  style={{ background: categoryColors[transaction.category] }}
+                  className="px-2 py-1 rounded text-white text-sm"
+                >
+                  {transaction.category}
+                </span>
+              </TableCell>
+
+              {/* 6. Amount */}
+              <TableCell className={cn(
+                "text-right font-medium",
+                transaction.type === "EXPENSE" ? "text-red-500" : "text-green-500"
+              )}>
+                {transaction.type === "EXPENSE" ? "-" : "+"}
+                ₱{transaction.amount.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </TableCell>
+
+              {/* 7. Recurring */}
+              <TableCell>
+                {transaction.isRecurring ? (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger>
+                        <Badge variant="outline" className="gap-1 bg-purple-100 text-purple-700 hover:bg-purple-200">
+                          <RefreshCw className="h-3 w-3" />
+                          {RECURRING_INTERVALS[transaction.recurringInterval]}
+                        </Badge>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <div className="text-sm">
+                          <div className="font-medium">Next Date:</div>
+                          <div>{format(new Date(transaction.nextRecurringDate), "PP")}</div>
+                        </div>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                ) : (
+                  <Badge variant="outline" className="gap-1">
+                    <Clock className="h-3 w-3" />
+                    One-time
+                  </Badge>
+                )}
+              </TableCell>
+
+              {/* 8. Actions */}
+              <TableCell>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" className="h-8 w-8 p-0">
+                      <MoreHorizontal className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem
+                      onClick={() => router.push(`/transaction/create?edit=${transaction.id}`)}
                     >
-                        {transaction.type === "EXPENSE" ? "-" : "+"}
-                        ₱{transaction.amount.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </TableCell>
-                    <TableCell>
-                        {transaction.isRecurring?(
-                        <TooltipProvider>
-                            <Tooltip>
-                                <TooltipTrigger>
-                                    <Badge variant="outline" className="gap-1 bg-purple-100
-                                    text-purple-700 hover:bg-purple-200"
-                                    >
-                                        <RefreshCw className='h-3 w-3'/>
-                                    { 
-                                    RECURRING_INTERVALS [
-                                            transaction.recurringInterval
-                                       ]
-                                    }
-                                    </Badge>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                    <div className='text-sm'>
-                                        <div className='font-medium'>Next Date:</div>
-                                        <div>
-                                            {format(new Date(transaction.nextRecurringDate), "PP")}
-                                        </div>
-                                    </div>
-                                </TooltipContent>
-                            </Tooltip>
-                        </TooltipProvider>
-                        ) : (
-                            <Badge variant="outline" className="gap-1">
-                                <Clock className='h-3 w-3'/>
-                                One-time
-                            </Badge>
-                        )}
-                    </TableCell>
+                      Edit
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      className="text-destructive"
+                      onClick={() => deleteFn([transaction.id])}
+                    >
+                      Delete
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </TableCell>
 
-                    <TableCell>
-                        <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                                <Button variant='ghost' className='h-8 w-8 p-0'>
-                                    <MoreHorizontal className='h-4 w-4'/>
-                                </Button>
-                            </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
-                                    <DropdownMenuItem
-                                        onClick={() =>
-                                            router.push(
-                                                `/transaction/create?edit=${transaction.id}`
-                                            )
-                                        }                               
-                                    
-                                    >
-
-                                        Edit
-                                    </DropdownMenuItem>
-                                    <DropdownMenuSeparator />
-                                    <DropdownMenuItem 
-                                        className='text-destructive'
-                                        onClick={() => deleteFn([transaction.id])}
-                                    >
-                                        Delete
-                                    </DropdownMenuItem>
-                                </DropdownMenuContent>
-                        </DropdownMenu>
-                    </TableCell>
-                </TableRow>
-                    ))
+            </TableRow>
+          ))
                 )}
         </TableBody>
     </Table>
@@ -510,22 +513,20 @@ useEffect(() => {
         {/* Description */}
         <div className="font-medium">{transaction.description || "—"}</div>
 
-        {/* Category + Goal */}
-        <div className="flex flex-wrap gap-2">
-          <span
-            style={{ background: categoryColors[transaction.category] }}
-            className="px-2 py-1 rounded text-white text-xs capitalize"
-          >
-            {transaction.category}
-          </span>
-          {transaction.goal ? (
-            <Badge variant="secondary" className="bg-blue-100 text-blue-700 text-xs">
-              🎯 {transaction.goal.title}
-            </Badge>
-          ) : (
-            <span className="text-xs text-muted-foreground">No Goal</span>
-          )}
-        </div>
+        {/* Savings Allocation */}
+        {transaction.allocations?.length > 0 && (
+          <div className="flex flex-col gap-1">
+            {transaction.allocations.map((a) => (
+              <Badge
+                key={a.goalId}
+                variant="secondary"
+                className="bg-blue-100 text-blue-700 text-xs w-fit"
+              >
+                🎯 {a.goalTitle} — ₱{a.amount.toLocaleString("en-PH", { minimumFractionDigits: 2 })}
+              </Badge>
+            ))}
+          </div>
+        )}
 
         {/* Amount + Recurring */}
         <div className="flex items-center justify-between">

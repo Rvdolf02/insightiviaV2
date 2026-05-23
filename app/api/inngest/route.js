@@ -1,5 +1,5 @@
 import { inngest } from "@/lib/inngest/client";
-import { checkBudgetAlert, generateMonthlyReports, processRecurringTransactions, triggerRecurringTransactions } from "@/lib/inngest/functions";
+import { checkBudgetAlert, generateMonthlyReports, processRecurringNote, processRecurringTransactions, triggerRecurringNotes, triggerRecurringTransactions } from "@/lib/inngest/functions";
 import { serve } from "inngest/next";
 
 // Create an API that serves zero functions
@@ -9,5 +9,7 @@ export const { GET, POST, PUT } = serve({
     triggerRecurringTransactions,
     processRecurringTransactions,
     generateMonthlyReports,
+    triggerRecurringNotes,
+    processRecurringNote,
   ],
 });

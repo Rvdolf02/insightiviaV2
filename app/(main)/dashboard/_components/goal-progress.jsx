@@ -102,8 +102,8 @@ const GoalProgress = ({
     if (goalResult?.success && !goalLoading) {
       toast.success(
         editMode || editingGoal
-          ? "Goal updated successfully"
-          : "Goal created successfully"
+          ? "Changes have been applied successfully."
+          : "Funds can now be tracked against this allocation."
       );
       reset();
       setIsAdding(false);
@@ -129,23 +129,28 @@ const GoalProgress = ({
     try {
       await deleteFn(selectedGoal.id); // trigger delete
     } catch (err) {
-      toast.error(err?.message || "Failed to delete goal");
+      toast.error(err?.message || "Action failed");
     } finally {
       setOpenDialog(false); // always close
     }
   };
 
   useEffect(() => {
-    if (deleteResult?.success && !deleteLoading) {
-      toast.success("Goal deleted successfully");
-      router.refresh();
+    if (!deleteLoading && deleteResult) {
+      if (deleteResult.success) {
+        toast.success("This allocation is no longer tracked.");
+        router.refresh();
+      } else {
+        if (deleteResult.type === "HAS_ALLOCATIONS") {
+          toast.warning(deleteResult.message); // softer UX
+        } else {
+          toast.error(deleteResult.message);
+        }
+      }
     }
   }, [deleteResult, deleteLoading, router]);
 
-  useEffect(() => {
-    if (deleteError) toast.error(deleteError.message || "Failed to delete goal");
-  }, [deleteError]);
-
+ 
   return (
     <div className="space-y-6">
       {/* Add/Edit Form */}
@@ -155,15 +160,15 @@ const GoalProgress = ({
           className="space-y-4 border p-4 rounded-xl shadow-sm bg-white"
         >
           <div className="space-y-2">
-            <label className="text-sm font-medium">Goal Title</label>
-            <Input placeholder="Enter goal title" {...register("title")} />
+            <label className="text-sm font-medium">Allocation Name</label>
+            <Input placeholder="Enter allocation name" {...register("title")} />
             {errors.title && (
               <p className="text-sm text-red-500">{errors.title.message}</p>
             )}
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm font-medium">Goal Amount</label>
+            <label className="text-sm font-medium">Allocated Amount</label>
             <Input
               type="number"
               step="0.01"
@@ -176,7 +181,7 @@ const GoalProgress = ({
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm font-medium">Account</label>
+            <label className="text-sm font-medium">Fund Source</label>
             <Controller
               name="accountId"
               control={control}
@@ -222,12 +227,12 @@ const GoalProgress = ({
               {goalLoading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  {editingGoal ? "Updating..." : "Creating..."}
+                  {editingGoal ? "Applying..." : "Processing..."}
                 </>
               ) : editingGoal ? (
-                "Update Goal"
+                "Update Allocation"
               ) : (
-                "Create Goal"
+                "Create Allocation"
               )}
             </Button>
           </div>
@@ -236,7 +241,7 @@ const GoalProgress = ({
         <>
           {/* Header + Add Button */}
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold">🎯 My Goals</h2>
+            <h2 className="text-lg font-semibold">💰 Savings Allocations</h2>
          
           </div>
 
@@ -258,8 +263,8 @@ const GoalProgress = ({
                       <div className="flex-1">
                         <CardTitle className="gap-1">{goal.title}</CardTitle>
                         <CardDescription>
-                          ₱{goal.currentAmount?.toLocaleString()} / ₱
-                          {goal.amount?.toLocaleString()}
+                          ₱{goal.currentAmount?.toLocaleString()} funded • ₱
+                          {goal.amount?.toLocaleString()} target
                         </CardDescription>
                       </div>
                       <DropdownMenu>
@@ -283,13 +288,13 @@ const GoalProgress = ({
                               });
                             }}
                           >
-                            <Pencil className="h-4 w-4 text-gray-600" /> Edit
+                            <Pencil className="h-4 w-4 text-gray-600" /> Update Allocation
                           </DropdownMenuItem>
                            <DropdownMenuItem
                             className="text-red-500 focus:text-red-700 hover:bg-red-50 cursor-pointer"
                             onClick={() => handleOpenDeleteDialog(goal)}
                           >
-                            <Trash className="h-4 w-4 text-red-600" /> Delete
+                            <Trash className="h-4 w-4 text-red-600" /> Remove Allocation
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
@@ -298,7 +303,7 @@ const GoalProgress = ({
                       <div className="space-y-2">
                         <Progress value={progress} />
                         <p className="text-xs text-muted-foreground text-right">
-                          {progress.toFixed(1)}% achieved
+                          {progress.toFixed(1)}% funded
                         </p>
                       </div>
                     </CardContent>
@@ -322,7 +327,7 @@ const GoalProgress = ({
               <CardContent className="flex flex-col items-center justify-center p-6 text-center">
                 <Plus className="w-6 h-6 mb-2 text-muted-foreground" />
                 <span className="text-sm font-medium text-muted-foreground">
-                  Add New Goal
+                  Add Allocation
                 </span>
               </CardContent>
             </Card>
@@ -334,9 +339,9 @@ const GoalProgress = ({
       <AlertDialog open={openDialog} onOpenChange={setOpenDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete goal? "{selectedGoal?.title}"</AlertDialogTitle>
+            <AlertDialogTitle>Remove Allocation? "{selectedGoal?.title}"</AlertDialogTitle>
             <p className="text-sm text-muted-foreground">
-              This will permanently delete <strong>{selectedGoal?.title}</strong>. This action cannot be undone.
+              This allocation will permanently removed and its progress will no longer be tracked.
             </p>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -349,7 +354,7 @@ const GoalProgress = ({
                 disabled={deleteLoading}
                 className="px-3 py-1 rounded-md bg-red-600 text-white disabled:opacity-60"
               >
-                {deleteLoading ? "Deleting..." : "Delete"}
+                {deleteLoading ? "Removing..." : "Remove"}
               </button>
             </AlertDialogAction>
           </AlertDialogFooter>
