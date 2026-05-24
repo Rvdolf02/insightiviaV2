@@ -25,13 +25,23 @@ const aj = arcjet({
 const clerk = clerkMiddleware(async (auth, req) => {
     const { userId } = await auth();
 
-    if (!userId && req.nextUrl.pathname.startsWith("/api")) {
-  return new Response(
-    JSON.stringify({ message: "Unauthorized" }),
-    { status: 401 }
-  );
-}
+    const publicApiRoutes = [
+      "/api/inngest",
+    ];
 
+    if (
+      !userId &&
+      req.nextUrl.pathname.startsWith("/api") &&
+      !publicApiRoutes.some(route =>
+        req.nextUrl.pathname.startsWith(route)
+      )
+    ) {
+      return new Response(
+        JSON.stringify({ message: "Unauthorized" }),
+        { status: 401 }
+      );
+    }
+    
     if (!userId && isProtectedRoute(req)) {
      const { redirectToSignIn } = await auth();   
 
