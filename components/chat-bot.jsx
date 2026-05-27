@@ -2,8 +2,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { 
-  MessageCircle, X, Send, Paperclip, 
-  Bot, LayoutGrid, Settings, Wallet, Loader2 
+  MessageCircle, X, Send, LayoutGrid, Wallet, Loader2, Bot 
 } from "lucide-react";
 import { chatBot } from "@/actions/chat-bot";
 
@@ -34,29 +33,54 @@ const ChatBot = () => {
     const text = customMsg || input;
     if (!text.trim() || loading) return;
 
-    // 1. Create the new message object
     const userMsg = { role: "user", content: text };
     
-    // 2. Update UI immediately
     setMessages(prev => [...prev, userMsg]);
     setInput("");
     setLoading(true);
 
     try {
-      // 3. Prepare a clean array for the server (avoiding state reference issues)
       const historyForAI = [...messages]; 
-      
       const data = await chatBot(text, historyForAI);
       
       if (data && data.response) {
         setMessages((prev) => [...prev, { role: "ai", content: data.response }]);
       }
     } catch (err) {
-      console.error("Full Client Error:", err); // CHECK YOUR BROWSER CONSOLE FOR THIS
+      console.error("Full Client Error:", err);
       setMessages((prev) => [...prev, { role: "ai", content: "System error. Please try again." }]);
     } finally {
       setLoading(false);
     }
+  };
+
+  // Helper method to parse basic markdown structures safely 
+  const formatMessage = (text) => {
+    return text.split("\n").map((line, lineIndex) => {
+      // Handle Bold Parsing (**text**)
+      const boldRegex = /\*\*(.*?)\*\*/g;
+      const parts = [];
+      let lastIndex = 0;
+      let match;
+
+      while ((match = boldRegex.exec(line)) !== null) {
+        if (match.index > lastIndex) {
+          parts.push(line.substring(lastIndex, match.index));
+        }
+        parts.push(<strong key={match.index} className="font-semibold text-slate-900">{match[1]}</strong>);
+        lastIndex = boldRegex.lastIndex;
+      }
+      
+      if (lastIndex < line.length) {
+        parts.push(line.substring(lastIndex));
+      }
+
+      return (
+        <span key={lineIndex} className="block min-h-[1rem]">
+          {parts.length > 0 ? parts : line}
+        </span>
+      );
+    });
   };
   
   return (
@@ -93,13 +117,15 @@ const ChatBot = () => {
           </div>
 
           {/* Chat Content */}
-          <div className="flex-1 overflow-y-auto p-5 space-y-6">
+          <div className="flex-1 overflow-y-auto p-5 space-y-4">
             {messages.map((m, i) => (
               <div key={i} className={`flex flex-col ${m.role === 'user' ? 'items-end' : 'items-start'}`}>
                 <div className={`p-4 rounded-[22px] text-sm leading-relaxed shadow-sm max-w-[85%] animate-in fade-in slide-in-from-bottom-1 ${
-                  m.role === 'ai' ? 'bg-white border border-slate-200 text-slate-700 rounded-tl-none' : 'bg-blue-600 text-white rounded-tr-none'
+                  m.role === 'ai' 
+                    ? 'bg-white border border-slate-200 text-slate-700 rounded-tl-none space-y-1' 
+                    : 'bg-blue-600 text-white rounded-tr-none'
                 }`}>
-                  {m.content}
+                  {m.role === 'ai' ? formatMessage(m.content) : m.content}
                 </div>
               </div>
             ))}
